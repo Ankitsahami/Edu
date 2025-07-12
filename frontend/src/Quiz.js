@@ -1,59 +1,81 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { getContract } from "./contract"; // ✅ smart contract helper
 
 const API_URL = "https://5000-ankitsahami-edu-9v1pcwyztuw.ws-us120.gitpod.io";
 
 const Quiz = () => {
   const [questions, setQuestions] = useState([]);
-  const [currentQ, setCurrentQ] = useState(0);
-  const [score, setScore] = useState(0);
-  const [username, setUsername] = useState("anon");
-  const [submitted, setSubmitted] = useState(false);
+  const [answers, setAnswers] = useState({});
+  const [username, setUsername] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/questions`)
-      .then(res => setQuestions(res.data))
-      .catch(err => console.error(err));
+    axios.get(`${API_URL}/api/questions`).then((res) => setQuestions(res.data));
+    getWalletAddress();
   }, []);
 
-  const handleAnswer = (selected) => {
-    const question = questions[currentQ];
-
-    axios.post(`${API_URL}/api/answer`, {
-      username,
-      questionId: question.id,
-      selectedOption: selected
-    }).then(res => {
-      if (res.data.correct) {
-        alert("✅ Correct!");
-      } else {
-        alert("❌ Incorrect!");
-      }
-      setScore(res.data.score);
-      if (currentQ + 1 < questions.length) {
-        setCurrentQ(currentQ + 1);
-      } else {
-        setSubmitted(true);
-      }
-    });
+  const getWalletAddress = async () => {
+    if (window.ethereum) {
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      setUsername(accounts[0]); // Use wallet as username
+    }
   };
 
-  if (!questions.length) return <p>Loading questions...</p>;
-  if (submitted) return <h2>Quiz completed! Your score: {score}</h2>;
+  const handleAnswer = async (qid, selectedOption) => {
+    try {
+      const res = await axios.post(`${API_URL}/api/answer`, {
+        username,
+        questionId: qid,
+        selectedOption,
+      });
 
-  const q = questions[currentQ];
+      const { correct, score } = res.data;
+      setAnswers((prev) => ({ ...prev, [qid]: correct }));
+      setMessage(correct ? "✅ Correct!" : "❌ Incorrect!");
+
+      // ✅ If correct, update on-chain score
+      if (correct) {
+        const contract = getContract();
+        const tx = await contract.setScore(score);
+        await tx.wait();
+        console.log("✅ Score updated on-chain");
+      }
+
+    } catch (err) {
+      setMessage("Error submitting answer");
+    }
+  };
 
   return (
     <div>
-      <h2>Welcome, {username}</h2>
-      <h3>Question {currentQ + 1}: {q.question}</h3>
-      <ul>
-        {q.options.map((opt, idx) => (
-          <li key={idx}>
-            <button onClick={() => handleAnswer(idx)}>{opt}</button>
-          </li>
-        ))}
-      </ul>
+      <h2>🧩 Quiz</h2>
+      {questions.map((q) => (
+        <div key={q.id} style={{ marginBottom: "1rem" }}>
+          <p>
+            <strong>{q.question}</strong>
+          </p>
+          {q.options.map((opt, i) => (
+            <button
+              key={i}
+              onClick={() => handleAnswer(q.id, i)}
+              disabled={answers[q.id] !== undefined}
+              style={{
+                marginRight: "10px",
+                backgroundColor:
+                  answers[q.id] !== undefined
+                    ? i === q.correctOption
+                      ? "green"
+                      : "red"
+                    : "",
+              }}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      ))}
+      <p>{message}</p>
     </div>
   );
 };
