@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ethers } from "ethers";
+import { BrowserProvider, BigNumber } from "ethers";
 import { getContract } from "./contract";
 
 export default function ScoreManager() {
@@ -9,7 +9,6 @@ export default function ScoreManager() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Connect wallet and fetch score on mount
   useEffect(() => {
     async function init() {
       if (!window.ethereum) {
@@ -20,7 +19,7 @@ export default function ScoreManager() {
         const [address] = await window.ethereum.request({ method: "eth_requestAccounts" });
         setWalletAddress(address);
 
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const provider = new BrowserProvider(window.ethereum);
         const contract = getContract(provider);
 
         const onChainScore = await contract.getScore(address);
@@ -44,11 +43,11 @@ export default function ScoreManager() {
     }
     setLoading(true);
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
+      const provider = new BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
       const contract = getContract(signer);
 
-      const tx = await contract.updateScore(ethers.BigNumber.from(newScore));
+      const tx = await contract.updateScore(BigNumber.from(newScore));
       await tx.wait();
 
       setScore(Number(newScore));
