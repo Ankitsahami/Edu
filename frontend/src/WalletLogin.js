@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ethers } from "ethers";
+import { BrowserProvider } from "ethers"; // ✅ fixed import
 
 const API_URL = "https://5000-ankitsahami-edu-9v1pcwyztuw.ws-us120.gitpod.io";
 
@@ -14,7 +14,7 @@ const WalletLogin = ({ onLogin }) => {
         return;
       }
 
-      const provider = new ethers.BrowserProvider(window.ethereum); // ethers v6
+      const provider = new BrowserProvider(window.ethereum); // ✅ correct usage for ethers v6
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
       const signer = await provider.getSigner();
       const userAddress = await signer.getAddress();
